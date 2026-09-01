@@ -3,46 +3,86 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Processing Payment... - Phantom V2</title>
+  <title>Payment successful - Phantom V2</title>
   <style>
     body { font-family: Arial, sans-serif; background: #0a0a09; color: #e0e0e0; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-    .box { text-align: center; padding: 40px; border: 1px solid #2a2a3e; border-radius: 12px; background: #15151a; max-width: 480px; }
-    h1 { font-size: 1.3rem; margin-bottom: 10px; }
+    .box { text-align: center; padding: 32px; border: 1px solid #2a2a3e; border-radius: 12px; background: #15151a; max-width: 520px; }
+    h1 { font-size: 1.3rem; margin-bottom: 10px; color: #00ff9d; }
     p { color: #a0a0b0; }
+    .key { font-family: 'Courier New', monospace; font-size: 1.2rem; color: #00d4ff; word-break: break-all; background: #0a0a09; border: 1px solid #2a2a3e; border-radius: 8px; padding: 10px 14px; margin: 12px 0; }
+    .discord { text-align: left; background: #15151f; border: 1px solid #5865f2; border-radius: 10px; padding: 16px 20px; margin: 16px 0; }
+    .discord-title { color: #5865f2; font-weight: bold; margin-bottom: 8px; }
+    .discord ol { text-align: left; line-height: 2; padding-left: 20px; margin: 0; }
+    .discord a { color: #5865f2; }
+    .discord code { background: #0a0a09; padding: 2px 8px; border-radius: 6px; font-family: 'Courier New', monospace; color: #e0e0e0; }
+    .btn { display: inline-block; margin-top: 8px; padding: 10px 24px; background: #5865f2; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; text-decoration: none; }
+    .cnt { color: #00d4ff; font-weight: bold; }
   </style>
 </head>
 <body>
-  <div class="box">
+  <div class="box" id="panel">
     <h1>Confirming your payment...</h1>
     <p id="msg">Please wait - you will be redirected automatically.</p>
   </div>
 
-    <script>
-    var params = new URLSearchParams(window.location.search);
-    var orderID = params.get('token') || params.get('orderID') || '';
-    var msg = document.getElementById('msg');
-    if (!orderID) {
-      msg.textContent = 'Missing order reference.';
-    } else {
-      fetch('/api/checkout/capture-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderID: orderID })
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(d) {
-        if (d.licenseKey) {
-          // Send the buyer back to the main site with their license key
-          location.replace('https://zylenofficial.github.io/choatix-v2/?checkout=success&token=' +
-            encodeURIComponent(d.licenseKey) + '&plan=' + encodeURIComponent(d.plan || 'pro'));
-        } else {
-          msg.textContent = 'Payment could not be confirmed. Contact support with order: ' + orderID;
-        }
-      })
-      .catch(function() {
-        msg.textContent = 'Error confirming payment. Contact support with order: ' + orderID;
-      });
-    }
-    </script>
+  <script>
+  var params = new URLSearchParams(window.location.search);
+  var orderID = params.get('token') || params.get('orderID') || '';
+  var msg = document.getElementById('msg');
+  var REDIRECT_URL = 'https://zylenofficial.github.io/choatix-v2/#license';
+
+  function discordSteps(key) {
+    return '<div class="discord">' +
+      '<div class="discord-title">&#9889; ACTIVATE YOUR LICENSE ON DISCORD</div>' +
+      '<ol>' +
+      '<li>Join our <a href="https://discord.gg/AhEK85REhG" target="_blank">Discord server</a></li>' +
+      '<li>Open the <b>&#7547;&#7511;&#638;&#115;</b> channel</li>' +
+      '<li>Create a <b>ticket</b></li>' +
+      '<li>Type <code>/redeem</code> and paste your license key:</li>' +
+      '</ol>' +
+      '<div class="key" style="margin:10px 0 0 0">' + key + '</div>' +
+      '</div>';
+  }
+
+  function showSuccess(key) {
+    var panel = document.getElementById('panel');
+    panel.innerHTML =
+      '<h1>Payment successful!</h1>' +
+      '<p>Your license key:</p>' +
+      '<div class="key">' + key + '</div>' +
+      discordSteps(key) +
+      '<p>Redirecting to Phantom V2 in <span class="cnt" id="cnt">15</span>s...</p>' +
+      '<button class="btn" onclick="location.replace(\'' + REDIRECT_URL + '\')">Continue now</button>';
+
+    var n = 15;
+    var iv = setInterval(function() {
+      n--;
+      var c = document.getElementById('cnt');
+      if (c) c.textContent = n;
+      if (n <= 0) { clearInterval(iv); location.replace(REDIRECT_URL + '?key=' + encodeURIComponent(key)); }
+    }, 1000);
+  }
+
+  if (!orderID) {
+    msg.textContent = 'Missing order reference.';
+  } else {
+    fetch('/api/checkout/capture-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderID: orderID })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.licenseKey) {
+        showSuccess(d.licenseKey);
+      } else {
+        msg.textContent = 'Payment could not be confirmed. Contact support with order: ' + orderID;
+      }
+    })
+    .catch(function() {
+      msg.textContent = 'Error confirming payment. Contact support with order: ' + orderID;
+    });
+  }
+  </script>
 </body>
 </html>
