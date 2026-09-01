@@ -53,7 +53,7 @@ router.post('/create-order', async (req, res) => {
       }],
       application_context: {
         brand_name: 'Phantom V2',
-        landing_page: 'BILLING_ADDRESS',
+        landing_page: 'NO_PREFERENCE',
         user_action: 'PAY_NOW',
         return_url: `${process.env.BASE_URL || 'http://localhost:3000'}/checkout-success.html`,
         cancel_url: `${process.env.BASE_URL || 'http://localhost:3000'}/index.html#pricing`
