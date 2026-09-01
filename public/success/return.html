@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Processing Payment... - Phantom V2</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #0a0a09; color: #e0e0e0; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+    .box { text-align: center; padding: 40px; border: 1px solid #2a2a3e; border-radius: 12px; background: #15151a; max-width: 480px; }
+    h1 { font-size: 1.3rem; margin-bottom: 10px; }
+    p { color: #a0a0b0; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Confirming your payment...</h1>
+    <p id="msg">Please wait - you will be redirected automatically.</p>
+  </div>
+
+    <script>
+    var params = new URLSearchParams(window.location.search);
+    var orderID = params.get('token') || params.get('orderID') || '';
+    var msg = document.getElementById('msg');
+    if (!orderID) {
+      msg.textContent = 'Missing order reference.';
+    } else {
+      fetch('/api/checkout/capture-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderID: orderID })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.licenseKey) {
+          // Send the buyer back to the main site with their license key
+          location.replace('https://zylenofficial.github.io/choatix-v2/?checkout=success&token=' +
+            encodeURIComponent(d.licenseKey) + '&plan=' + encodeURIComponent(d.plan || 'pro'));
+        } else {
+          msg.textContent = 'Payment could not be confirmed. Contact support with order: ' + orderID;
+        }
+      })
+      .catch(function() {
+        msg.textContent = 'Error confirming payment. Contact support with order: ' + orderID;
+      });
+    }
+    </script>
+</body>
+</html>

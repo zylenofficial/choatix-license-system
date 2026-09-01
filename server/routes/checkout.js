@@ -5,21 +5,8 @@ const { client } = require('../lib/paypalClient');
 const { generateLicenseKey } = require('../lib/licenseGenerator');
 const { createLicense } = require('../lib/database');
 
-// Pricing configuration
-const PRICING = {
-  pro: {
-    name: 'Phantom V2 Pro',
-    price: 5.99,
-    currency: 'USD',
-    description: 'One-time license for Phantom V2 Pro - Access to all features'
-  },
-  phantom: {
-    name: 'Phantom V2 Phantom',
-    price: 9.99,
-    currency: 'USD',
-    description: 'One-time license for Phantom V2 Phantom - All features + advanced optimizations'
-  }
-};
+// Pricing configuration (shared with license routes)
+const PRICING = require('../lib/pricing');
 
 /**
  * POST /api/checkout/create-order

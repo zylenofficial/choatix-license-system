@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const paypal = require('@paypal/checkout-server-sdk');
 const { getLicenseByKey, getLicenseByDiscordId, createLicense } = require('../lib/database');
-const { validateLicenseFormat } = require('../lib/licenseGenerator');
+const { generateLicenseKey, validateLicenseFormat } = require('../lib/licenseGenerator');
+const { client } = require('../lib/paypalClient');
+const PRICING = require('../lib/pricing');
 
 /**
  * GET /api/license/verify/:key
@@ -134,6 +137,91 @@ router.post('/validate', (req, res) => {
   } catch (error) {
     console.error('Error validating licenses:', error);
     res.status(500).json({ error: 'Failed to validate licenses' });
+  }
+});
+
+// ── COMPAT: /api/license/checkout ──────────────────────────────
+// Same request/response shape the main site (choatix-v2 docs/app.js) expects.
+// Body: { plan, amount (ignored - server-side pricing), discordId, email, return_url (ignored), cancel_url }
+// Response: { approvalUrl } - buyer is sent to PayPal, then to /success/return.html
+router.post('/checkout', async (req, res) => {
+  try {
+    const { plan, discordId, username, email, cancel_url } = req.body;
+
+    const planConfig = PRICING[plan];
+    if (!planConfig) {
+      return res.status(400).json({ error: 'Invalid plan selected' });
+    }
+
+    const request = new paypal.orders.OrdersCreateRequest();
+    request.requestBody({
+      intent: 'CAPTURE',
+      purchase_units: [{
+        description: planConfig.description,
+        custom_id: JSON.stringify({
+          plan: plan,
+          discordId: discordId || null,
+          username: username || null
+        }),
+        soft_descriptor: 'Phantom V2 License',
+        amount: {
+          currency_code: planConfig.currency,
+          value: planConfig.price.toFixed(2)
+        }
+      }],
+      application_context: {
+        brand_name: 'Phantom V2',
+        landing_page: 'NO_PREFERENCE',
+        user_action: 'PAY_NOW',
+        return_url: `${process.env.BASE_URL || 'http://localhost:3000'}/success/return.html`,
+        cancel_url: cancel_url || `${process.env.BASE_URL || 'http://localhost:3000'}/index.html#pricing`
+      }
+    });
+
+    const order = await client().execute(request);
+    const approvalUrl = order.result.links.find(l => l.rel === 'approve')?.href;
+
+    res.json({
+      orderID: order.result.id,
+      status: order.result.status,
+      approvalUrl: approvalUrl || null
+    });
+  } catch (error) {
+    console.error('Compat checkout error:', error);
+    res.status(500).json({ error: 'Failed to create order' });
+  }
+});
+
+// ── COMPAT: /api/license/free ──────────────────────────────────
+// Body: { discordId }
+// Response: { licenseKey, plan: 'free' } - one free license per Discord ID
+router.post('/free', (req, res) => {
+  try {
+    const { discordId } = req.body;
+    if (!discordId) {
+      return res.status(400).json({ error: 'Discord ID is required' });
+    }
+
+    const id = String(discordId);
+
+    // If this Discord user already has an active license, give them that one
+    const existing = getLicenseByDiscordId(id);
+    if (existing && existing.active) {
+      return res.json({ licenseKey: existing.key, plan: existing.plan });
+    }
+
+    const key = generateLicenseKey('free');
+    const license = createLicense({
+      key: key,
+      plan: 'free',
+      discordId: id,
+      transactionId: 'FREE-' + id
+    });
+
+    res.json({ licenseKey: license.key, plan: 'free' });
+  } catch (error) {
+    console.error('Free license error:', error);
+    res.status(500).json({ error: 'Failed to create free license' });
   }
 });
 
