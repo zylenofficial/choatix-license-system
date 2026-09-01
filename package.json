@@ -17,5 +17,8 @@
     "nodemon": "^3.0.1"
   },
   "author": "Phantom V2 Team",
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  }
 }

@@ -1,0 +1,21 @@
+# Render.com Blueprint - auto-configures the backend deployment
+# When you connect this repo on Render, everything below is pre-filled.
+# You will only be asked to paste PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET.
+services:
+  - type: web
+    name: choatix-license-system
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_MODE
+        value: sandbox
+      - key: BASE_URL
+        value: https://choatix-license-system.onrender.com
