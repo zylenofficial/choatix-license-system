@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Environment variables (PayPal secrets!)
+.env
+
+# Customer data / generated licenses
+server/data/licenses.json
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

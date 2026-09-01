@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phantom V2 — Gaming Optimization</title>
+    <meta name="description" content="Phantom V2 — Optimize your PC for maximum gaming performance. 200+ tweaks, FPS boost, system optimization.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="noise"></div>
+    <nav class="navbar">
+        <div class="container">
+            <div class="logo">PHANTOM V2</div>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#pricing">Pricing</a>
+                <a href="#license">License</a>
+            </div>
+        </div>
+    </nav>
+    <main>
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="container">
+                <h1 class="hero-title"><span class="line1">Maximize</span><span class="line2">Your</span><span class="line3">FPS</span></h1>
+                <p class="hero-subtitle">200+ system tweaks for peak gaming performance. One-click optimization.</p>
+                <div class="hero-buttons">
+                    <a href="#pricing" class="btn btn-primary">Get Started</a>
+                    <a href="#features" class="btn btn-secondary">Learn More</a>
+                </div>
+            </div>
+        </section>
+
+        
+        <!-- Features Section -->
+        <section id="features" class="section">
+            <div class="container">
+                <h2 class="section-title">Powerful Features</h2>
+                <div class="features-grid">
+                    <div class="feature-card reveal">
+                        <div class="feature-icon">⚡</div>
+                        <h3>System Optimizer</h3>
+                        <p>Apply 200+ performance tweaks. CPU, GPU, RAM, network, power — all optimized.</p>
+                    </div>
+                    <div class="feature-card reveal">
+                        <div class="feature-icon">🎮</div>
+                        <h3>Game Optimizer</h3>
+                        <p>Per-game profiles for Fortnite, Valorant, CS2, Apex, Minecraft and more.</p>
+                    </div>
+                    <div class="feature-card reveal">
+                        <div class="feature-icon">🚀</div>
+                        <h3>Quick Boost</h3>
+                        <p>Instant performance boost. Free up RAM, kill bloat, boost GPU priority.</p>
+                    </div>
+                    <div class="feature-card reveal">
+                        <div class="feature-icon">🎯</div>
+                        <h3>Zero Delay</h3>
+                        <p>Reduce input lag. Optimize timer resolution, mouse latency, render pipeline.</p>
+                    </div>
+                    <div class="feature-card reveal">
+                        <div class="feature-icon">📊</div>
+                        <h3>FPS Compare</h3>
+                        <p>Test before and after. See exact FPS improvement with side-by-side bars.</p>
+                    </div>
+                    <div class="feature-card reveal">
+                        <div class="feature-icon">🔒</div>
+                        <h3>Safe Rollback</h3>
+                                                <p>Every change is reversible. One click to restore original Windows settings.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pricing Section -->
+        <section id="pricing" class="section section-alt">
+            <div class="container">
+                <h2 class="section-title">Simple, Transparent Pricing</h2>
+                <p class="section-subtitle">Choose the perfect plan for your setup</p>
+                <div class="pricing-grid">
+                    <div class="pricing-card reveal">
+                        <div class="pricing-tier">FREE</div>
+                        <div class="pricing-price"><span class="price-amount">$0</span></div>
+                        <div class="pricing-period">Forever</div>
+                        <ul class="pricing-features">
+                            <li>System Health Overview</li>
+                            <li>Scan PC</li>
+                            <li>Quick Boost</li>
+                            <li>System Info</li>
+                            <li>Process Manager</li>
+                        </ul>
+                        <button class="btn btn-secondary" style="width: 100%;">Download Free</button>
+                    </div>
+                    <div class="pricing-card popular reveal">
+                        <div class="pricing-tier">PRO</div>
+                        <div class="pricing-price"><span class="price-amount">$5.99</span></div>
+                        <div class="pricing-period">One-time payment</div>
+                        <ul class="pricing-features">
+                            <li>Everything in Free</li>
+                            <li>200+ System Tweaks</li>
+                            <li>Game Presets (6+ games)</li>
+                            <li>Deep Clean (14 caches)</li>
+                            <li>FPS Compare Tool</li>
+                            <li>GPU / Network Optimizer</li>
+                            <li>Priority Support</li>
+                        </ul>
+                        <button class="btn btn-primary" style="width: 100%;" onclick="startCheckout('pro')">
+                            Get Pro - $5.99
+                        </button>
+                    </div>
+                    <div class="pricing-card reveal">
+                        <div class="pricing-tier">PHANTOM</div>
+                        <div class="pricing-price"><span class="price-amount">$9.99</span></div>
+                        <div class="pricing-period">One-time payment</div>
+                        <ul class="pricing-features">
+                            <li>Everything in Pro</li>
+                            <li>VBS / Hyper-V Control</li>
+                            <li>Registry Tuning</li>
+                            <li>Full Download Manager</li>
+                            <li>TrustedInstaller Elevation</li>
+                            <li>Auto Restore Points</li>
+                            <li>Ultimate Optimization</li>
+                        </ul>
+                        <button class="btn btn-primary" style="width: 100%;" onclick="startCheckout('phantom')">
+                            Get Phantom - $9.99
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- License Verification Section -->
+        <section id="license" class="section">
+            <div class="container">
+                <h2 class="section-title">License Verification</h2>
+                <div class="license-container">
+                    <div class="license-input">
+                        <input type="text" id="licenseKey" placeholder="Enter your license key" class="license-field">
+                        <button class="btn btn-primary" onclick="verifyLicense()">Verify License</button>
+                    </div>
+                    <div id="licenseResult" class="license-result"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-logo">PHANTOM V2</div>
+                <div class="footer-links">
+                    <a href="#features">Features</a>
+                    <a href="#pricing">Pricing</a>
+                    <a href="#license">License</a>
+                    <a href="https://discord.gg/your-discord-link" target="_blank">Discord</a>
+                </div>
+                <p class="footer-text">© 2024 Phantom V2. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/config.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
