@@ -27,7 +27,9 @@
 
   <script>
   var params = new URLSearchParams(window.location.search);
+  var sessionID = params.get('session_id') || '';
   var orderID = params.get('token') || params.get('orderID') || '';
+  var paymentRef = sessionID || orderID;
   var msg = document.getElementById('msg');
   var REDIRECT_URL = 'https://zylenofficial.github.io/choatix-v2/#license';
 
@@ -63,24 +65,25 @@
     }, 1000);
   }
 
-  if (!orderID) {
-    msg.textContent = 'Missing order reference.';
+  if (!paymentRef) {
+    msg.textContent = 'Missing payment reference.';
   } else {
+    var payload = sessionID ? { sessionID: sessionID } : { orderID: orderID };
     fetch('/api/checkout/capture-order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderID: orderID })
+      body: JSON.stringify(payload)
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (d.licenseKey) {
         showSuccess(d.licenseKey);
       } else {
-        msg.textContent = 'Payment could not be confirmed. Contact support with order: ' + orderID;
+        msg.textContent = 'Payment could not be confirmed. Contact support with reference: ' + paymentRef;
       }
     })
     .catch(function() {
-      msg.textContent = 'Error confirming payment. Contact support with order: ' + orderID;
+      msg.textContent = 'Error confirming payment. Contact support with reference: ' + paymentRef;
     });
   }
   </script>

@@ -1,56 +1,61 @@
 const express = require('express');
 const router = express.Router();
+const { stripe } = require('../lib/stripeClient');
+const { generateLicenseKey } = require('../lib/licenseGenerator');
+const { createLicense } = require('../lib/database');
+
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
 /**
  * POST /api/webhook
- * PayPal webhook handler for payment notifications
+ * Stripe webhook handler for payment notifications
  *
- * This endpoint receives notifications from PayPal about payment events.
- * In production, you should verify the webhook signature using:
- *   - The raw body (req.rawBody)
- *   - The 'Paypal-Transmission-Id'/'Paypal-Transmission-Time' headers
+ * NOTE: This route uses express.raw() to get the raw body for signature verification.
+ * Mount this route BEFORE express.json() in server.js.
  */
-router.post('/', (req, res) => {
+router.post('/', express.raw({ type: 'application/json' }), async (req, res) => {
   try {
-    // The body is parsed by the global express.json() middleware.
-    // For signature verification you would use req.rawBody.
-    const payload = req.body;
+    const sig = req.headers['stripe-signature'];
+    let event;
 
-    if (!payload || !payload.event_type) {
-      return res.status(400).json({ error: 'Invalid webhook payload' });
+    // Verify webhook signature if secret is configured
+    if (STRIPE_WEBHOOK_SECRET) {
+      try {
+        event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_SECRET);
+      } catch (err) {
+        console.error('Webhook signature verification failed:', err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+      }
+    } else {
+      // No secret configured — parse without verification (not recommended for production)
+      event = JSON.parse(req.body);
     }
 
-    // Log webhook event for debugging
-    console.log('PayPal Webhook Event:', payload.event_type);
+    // Handle successful payment
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
 
-    // Handle different event types
-    switch (payload.event_type) {
-      case 'PAYMENT.CAPTURE.COMPLETED':
-        console.log('Payment captured successfully');
-        // In a real implementation, you would:
-        // 1. Verify the transaction with PayPal
-        // 2. Update your database / generate + store the license key
-        // 3. Send a notification/email to the user
-        break;
+      if (session.payment_status === 'paid') {
+        const plan = session.metadata?.plan || 'pro';
+        const licenseKey = generateLicenseKey(plan);
 
-      case 'PAYMENT.CAPTURE.DENIED':
-        console.log('Payment denied');
-        break;
+        createLicense({
+          key: licenseKey,
+          plan: plan,
+          discordId: session.metadata?.discordId || null,
+          username: session.metadata?.username || null,
+          email: session.customer_details?.email || null,
+          transactionId: session.payment_intent,
+        });
 
-      case 'PAYMENT.CAPTURE.REFUNDED':
-        console.log('Payment refunded');
-        // Handle refund - deactivate license if needed
-        break;
-
-      default:
-        console.log('Unhandled event type:', payload.event_type);
+        console.log(`License created via Stripe webhook: ${licenseKey} for plan: ${plan}`);
+      }
     }
 
-    // Respond with 200 OK to acknowledge webhook
     res.status(200).json({ received: true });
   } catch (error) {
     console.error('Webhook error:', error);
-    res.status(400).json({ error: 'Webhook processing failed' });
+    res.status(500).json({ error: 'Webhook error' });
   }
 });
 

@@ -24,9 +24,10 @@ app.use(express.json({
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // API Routes
+// Webhook MUST be before express.json() — Stripe needs raw body for signature verification
+app.use('/api/webhook', webhookRoutes);
 app.use('/api/checkout', checkoutRoutes);
 app.use('/api/license', licenseRoutes);
-app.use('/api/webhook', webhookRoutes);
 
 // Serve the main index.html for any other routes (SPA)
 app.get('/', (req, res) => {

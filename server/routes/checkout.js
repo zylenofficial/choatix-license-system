@@ -1,17 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const paypal = require('@paypal/checkout-server-sdk');
-const { client } = require('../lib/paypalClient');
+const { stripe } = require('../lib/stripeClient');
 const { generateLicenseKey } = require('../lib/licenseGenerator');
 const { createLicense } = require('../lib/database');
-
-// Pricing configuration (shared with license routes)
 const PRICING = require('../lib/pricing');
 
-/**
- * POST /api/checkout/create-order
- * Create a PayPal order for the selected plan
- */
+const BASE_URL = (process.env.BASE_URL || 'http://localhost:3000').trim();
+
+// Create Stripe Checkout Session
 router.post('/create-order', async (req, res) => {
   try {
     const { plan, discordId, username } = req.body;
@@ -21,125 +17,85 @@ router.post('/create-order', async (req, res) => {
     }
 
     const planConfig = PRICING[plan];
-    
-    const request = new paypal.orders.OrdersCreateRequest();
-    request.requestBody({
-      intent: 'CAPTURE',
-      purchase_units: [{
-        description: planConfig.description,
-        custom_id: JSON.stringify({ 
-          plan, 
-          discordId: discordId || null, 
-          username: username || null 
-        }),
-        soft_descriptor: 'Phantom V2 License',
-        amount: {
-          currency_code: planConfig.currency,
-          value: planConfig.price.toFixed(2)
-        }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: planConfig.currency.toLowerCase(),
+          product_data: {
+            name: planConfig.name,
+            description: planConfig.description,
+          },
+          unit_amount: Math.round(planConfig.price * 100),
+        },
+        quantity: 1,
       }],
-      application_context: {
-        brand_name: 'Phantom V2',
-        landing_page: 'NO_PREFERENCE',
-        user_action: 'PAY_NOW',
-        return_url: `${(process.env.BASE_URL || 'http://localhost:3000').trim()}/checkout-success.html`,
-        cancel_url: `${(process.env.BASE_URL || 'http://localhost:3000').trim()}/index.html#pricing`
-      }
+      mode: 'payment',
+      success_url: `${BASE_URL}/success/return.html?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${BASE_URL}/index.html#pricing`,
+      metadata: {
+        plan: plan,
+        discordId: discordId || '',
+        username: username || '',
+      },
     });
-
-    const order = await client().execute(request);
-
-    // Find the PayPal approval link that the customer must visit
-    const approvalUrl = order.result.links.find(l => l.rel === 'approve')?.href;
 
     res.json({
-      orderID: order.result.id,
-      status: order.result.status,
-      approvalUrl: approvalUrl || null
+      orderID: session.id,
+      status: 'created',
+      approvalUrl: session.url,
     });
   } catch (error) {
-    console.error('Error creating PayPal order:', error);
-    res.status(500).json({ error: 'Failed to create order' });
+    console.error('Error creating Stripe session:', error);
+    res.status(500).json({ error: 'Failed to create checkout session' });
   }
 });
 
-/**
- * POST /api/checkout/capture-order
- * Capture a PayPal payment after user approval
- */
+// Capture payment (called after webhook confirms payment)
 router.post('/capture-order', async (req, res) => {
   try {
-    const { orderID, discordId, username } = req.body;
+    const { sessionID, discordId, username } = req.body;
     
-    if (!orderID) {
-      return res.status(400).json({ error: 'Order ID is required' });
+    if (!sessionID) {
+      return res.status(400).json({ error: 'Session ID is required' });
     }
 
-    const request = new paypal.orders.OrdersCaptureRequest(orderID);
+    const session = await stripe.checkout.sessions.retrieve(sessionID);
     
-    // Add user info to the request
-    if (discordId && username) {
-      request.requestBody({});
-    }
-    
-    const capture = await client().execute(request);
-    
-    if (capture.result.status === 'COMPLETED') {
-      const payment = capture.result.purchase_units[0];
-      const paymentId = capture.result.id;
-      
-      // Parse plan info from custom_id
-      let plan = 'pro'; // default
-      let discord_id = null;
-      let user_name = null;
-      
-      try {
-        if (payment.custom_id) {
-          const customData = JSON.parse(payment.custom_id);
-          plan = customData.plan || 'pro';
-          discord_id = customData.discordId || discordId || null;
-          user_name = customData.username || username || null;
-        }
-      } catch (e) {
-        console.error('Error parsing custom_id:', e);
-      }
-      
-      // Generate license key
+    if (session.payment_status === 'paid') {
+      const plan = session.metadata?.plan || 'pro';
       const licenseKey = generateLicenseKey(plan);
       
-      // Save license to database
       const license = createLicense({
         key: licenseKey,
         plan: plan,
-        discordId: discord_id,
-        username: user_name,
-        email: payment?.payer?.email_address || null,
-        transactionId: paymentId
+        discordId: session.metadata?.discordId || discordId || null,
+        username: session.metadata?.username || username || null,
+        email: session.customer_details?.email || null,
+        transactionId: session.payment_intent,
       });
-      
+
       res.json({
         status: 'success',
         message: 'Payment captured successfully',
         licenseKey: licenseKey,
         plan: plan,
-        license: license
+        license: license,
       });
     } else {
       res.status(400).json({ 
         error: 'Payment not completed',
-        status: capture.result.status 
+        status: session.payment_status,
       });
     }
   } catch (error) {
-    console.error('Error capturing PayPal payment:', error);
+    console.error('Error capturing payment:', error);
     res.status(500).json({ error: 'Failed to capture payment' });
   }
 });
 
-/**
- * GET /api/checkout/pricing
- * Get current pricing information
- */
+// Get pricing
 router.get('/pricing', (req, res) => {
   res.json(PRICING);
 });

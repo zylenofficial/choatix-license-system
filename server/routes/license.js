@@ -140,10 +140,8 @@ router.post('/validate', (req, res) => {
   }
 });
 
-// ── COMPAT: /api/license/checkout ──────────────────────────────
-// Same request/response shape the main site (choatix-v2 docs/app.js) expects.
-// Body: { plan, amount (ignored - server-side pricing), discordId, email, return_url (ignored), cancel_url }
-// Response: { approvalUrl } - buyer is sent to PayPal, then to /success/return.html
+// ── COMPAT: /api/license/checkout (Stripe) ──────────────────────
+// Same request/response shape the main site expects, but uses Stripe Checkout
 router.post('/checkout', async (req, res) => {
   try {
     const { plan, discordId, username, email, cancel_url } = req.body;
@@ -153,42 +151,37 @@ router.post('/checkout', async (req, res) => {
       return res.status(400).json({ error: 'Invalid plan selected' });
     }
 
-    const request = new paypal.orders.OrdersCreateRequest();
-    request.requestBody({
-      intent: 'CAPTURE',
-      purchase_units: [{
-        description: planConfig.description,
-        custom_id: JSON.stringify({
-          plan: plan,
-          discordId: discordId || null,
-          username: username || null
-        }),
-        soft_descriptor: 'Phantom V2 License',
-        amount: {
-          currency_code: planConfig.currency,
-          value: planConfig.price.toFixed(2)
-        }
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: planConfig.currency.toLowerCase(),
+          product_data: {
+            name: planConfig.name,
+            description: planConfig.description,
+          },
+          unit_amount: Math.round(planConfig.price * 100),
+        },
+        quantity: 1,
       }],
-      application_context: {
-        brand_name: 'Phantom V2',
-        landing_page: 'NO_PREFERENCE',
-        user_action: 'PAY_NOW',
-        return_url: `${(process.env.BASE_URL || 'http://localhost:3000').trim()}/success/return.html`,
-        cancel_url: cancel_url || `${(process.env.BASE_URL || 'http://localhost:3000').trim()}/index.html#pricing`
-      }
+      mode: 'payment',
+      success_url: `${BASE_URL}/success/return.html?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: cancel_url || `${BASE_URL}/index.html#pricing`,
+      metadata: {
+        plan: plan,
+        discordId: discordId || '',
+        username: username || '',
+      },
     });
 
-    const order = await client().execute(request);
-    const approvalUrl = order.result.links.find(l => l.rel === 'approve')?.href;
-
     res.json({
-      orderID: order.result.id,
-      status: order.result.status,
-      approvalUrl: approvalUrl || null
+      orderID: session.id,
+      status: 'created',
+      approvalUrl: session.url,
     });
   } catch (error) {
     console.error('Compat checkout error:', error);
-    res.status(500).json({ error: 'Failed to create order' });
+    res.status(500).json({ error: 'Failed to create checkout session' });
   }
 });
 
