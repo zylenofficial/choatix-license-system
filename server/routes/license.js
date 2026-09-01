@@ -173,8 +173,8 @@ router.post('/checkout', async (req, res) => {
         brand_name: 'Phantom V2',
         landing_page: 'NO_PREFERENCE',
         user_action: 'PAY_NOW',
-        return_url: `${process.env.BASE_URL || 'http://localhost:3000'}/success/return.html`,
-        cancel_url: cancel_url || `${process.env.BASE_URL || 'http://localhost:3000'}/index.html#pricing`
+        return_url: `${(process.env.BASE_URL || 'http://localhost:3000').trim()}/success/return.html`,
+        cancel_url: cancel_url || `${(process.env.BASE_URL || 'http://localhost:3000').trim()}/index.html#pricing`
       }
     });
 
