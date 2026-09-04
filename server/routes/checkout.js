@@ -32,8 +32,8 @@ router.post('/create-order', async (req, res) => {
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: `${BASE_URL}/success/return.html?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${BASE_URL}/index.html#pricing`,
+      success_url: `https://zylenofficial.github.io/choatix-v2/#license?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `https://zylenofficial.github.io/choatix-v2/#pricing`,
       metadata: {
         plan: plan,
         discordId: discordId || '',
