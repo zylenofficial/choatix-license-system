@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const paypal = require('@paypal/checkout-server-sdk');
 const { getLicenseByKey, getLicenseByDiscordId, createLicense } = require('../lib/database');
 const { generateLicenseKey, validateLicenseFormat } = require('../lib/licenseGenerator');
-const { client } = require('../lib/paypalClient');
+const { stripe } = require('../lib/stripeClient');
 const PRICING = require('../lib/pricing');
+
+const BASE_URL = (process.env.BASE_URL || 'http://localhost:3000').trim();
 
 /**
  * GET /api/license/verify/:key

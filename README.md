@@ -27,9 +27,9 @@ LICENSE-SYSTEM/
 │   ├── routes/
 │   │   ├── checkout.js     # PayPal checkout routes
 │   │   ├── license.js      # License generation/verification
-│   │   └── webhook.js      # PayPal webhook handler
+│   │   └── webhook.js      # Stripe webhook handler
 │   ├── lib/
-│   │   ├── paypalClient.js # PayPal SDK configuration
+│   │   ├── stripeClient.js   # Stripe SDK configuration
 │   │   ├── licenseGenerator.js # License key generation
 │   │   └── database.js     # Database operations
 │   └── data/
@@ -55,9 +55,7 @@ LICENSE-SYSTEM/
 2. **Configure Environment Variables** (`.env` file):
    ```
    PORT=3000
-   PAYPAL_CLIENT_ID=your_paypal_client_id
-   PAYPAL_CLIENT_SECRET=your_paypal_client_secret
-   PAYPAL_MODE=sandbox  # or 'live' for production
+   STRIPE_SECRET_KEY=your_stripe_secret_key
    BASE_URL=http://localhost:3000
    ```
 
@@ -129,7 +127,6 @@ This project can be deployed to:
 - **Any Node.js hosting platform**
 
 For production:
-1. Set `PAYPAL_MODE=live`
-2. Use production PayPal credentials
-3. Set appropriate BASE_URL
+1. Use a production `STRIPE_SECRET_KEY` (starts with `sk_live_`)
+2. Set appropriate BASE_URL
 4. Enable CORS for your domain
