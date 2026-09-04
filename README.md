@@ -79,7 +79,7 @@ LICENSE-SYSTEM/
 
 License keys are generated in the format: `XXXX-XXXX-XXXX-XXXX-XXXX`
 
-Example: `PHTN-9K2M-4L7Q-1X8R-5V3W`
+Example: `PHTN-9A2B-4C7D-1E8F-5B3C`
 
 ## API Endpoints
 
