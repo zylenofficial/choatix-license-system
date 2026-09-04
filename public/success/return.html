@@ -69,7 +69,7 @@
     msg.textContent = 'Missing payment reference.';
   } else {
     var payload = sessionID ? { sessionID: sessionID } : { orderID: orderID };
-    fetch('/api/checkout/capture-order', {
+    fetch('https://choatix-license-system.onrender.com/api/checkout/capture-order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
