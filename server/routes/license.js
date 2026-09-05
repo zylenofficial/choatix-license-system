@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getLicenseByKey, getLicenseByDiscordId, createLicense } = require('../lib/database');
+const { getLicenseByKey, getLicenseByDiscordId, createLicense, updateLicense } = require('../lib/database');
 const { generateLicenseKey, validateLicenseFormat } = require('../lib/licenseGenerator');
 const { stripe } = require('../lib/stripeClient');
 const PRICING = require('../lib/pricing');
@@ -252,6 +252,109 @@ router.post('/free', (req, res) => {
   } catch (error) {
     console.error('Free license error:', error);
     res.status(500).json({ error: 'Failed to create free license' });
+  }
+});
+
+// ── COMPAT: /api/license/verify-key (app activation) ────────────
+// The Phantom app POSTs { key, discordId } here to activate a license.
+// Works with the new PHTN/PHNTM keys purchased via Stripe.
+router.post('/verify-key', (req, res) => {
+  try {
+    const { key, discordId } = req.body;
+    if (!key) return res.status(400).json({ valid: false, message: 'Key required' });
+
+    const cleanKey = String(key).trim().toUpperCase();
+    const license = getLicenseByKey(cleanKey);
+
+    if (!license) {
+      return res.status(404).json({ valid: false, message: 'Invalid license key' });
+    }
+    if (license.active === false) {
+      return res.status(403).json({ valid: false, message: 'This license key has been deactivated' });
+    }
+    if (license.expiresAt && new Date(license.expiresAt) < new Date()) {
+      return res.status(403).json({ valid: false, message: 'This license key has expired' });
+    }
+
+    // Link the key to the activating Discord user (first activation wins)
+    if (discordId && !license.discordId) {
+      updateLicense(cleanKey, { discordId: String(discordId), activatedAt: new Date().toISOString() });
+    } else if (discordId && license.discordId && license.discordId !== String(discordId)) {
+      return res.status(403).json({ valid: false, message: 'This license key is already linked to another Discord account' });
+    }
+
+    const tier = license.plan === 'phantom' ? 'PREMIUM' : license.plan === 'pro' ? 'PRO' : 'FREE';
+    res.json({ valid: true, tier, plan: license.plan, key: license.key });
+  } catch (error) {
+    console.error('verify-key error:', error);
+    res.status(500).json({ valid: false, message: 'Internal server error' });
+  }
+});
+
+// ── COMPAT: /api/redeem (Discord bot) ───────────────────────────
+// The Discord bot POSTs { key, discordId, username } here.
+router.post('/redeem', (req, res) => {
+  try {
+    const { key, discordId, username } = req.body;
+    if (!key) return res.status(400).json({ success: false, message: 'Key required' });
+
+    const cleanKey = String(key).trim().toUpperCase();
+    const license = getLicenseByKey(cleanKey);
+
+    if (!license) {
+      return res.json({ success: false, message: 'Invalid license key. Double-check and try again.' });
+    }
+    if (license.active === false) {
+      return res.json({ success: false, message: 'This license key has been deactivated.' });
+    }
+    if (license.expiresAt && new Date(license.expiresAt) < new Date()) {
+      return res.json({ success: false, message: 'This license key has expired.' });
+    }
+    if (license.discordId && license.discordId !== String(discordId)) {
+      return res.json({ success: false, message: 'This license key has already been redeemed by another user.' });
+    }
+
+    updateLicense(cleanKey, {
+      discordId: String(discordId),
+      username: username || license.username,
+      activatedAt: new Date().toISOString(),
+    });
+
+    const tier = license.plan === 'phantom' ? 'PREMIUM' : license.plan === 'pro' ? 'PRO' : 'FREE';
+    res.json({ success: true, tier, plan: license.plan, key: license.key });
+  } catch (error) {
+    console.error('redeem error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// ── COMPAT: /api/license/:discordId (app status lookup) ─────────
+// Same as /discord/:discordId but with the path the app and bot already use.
+router.get('/:discordId', (req, res) => {
+  try {
+    const discordId = String(req.params.discordId || '').trim();
+    if (!discordId || discordId === 'verify' || discordId === 'discord' || discordId === 'validate') {
+      return res.status(400).json({ error: 'Discord ID is required' });
+    }
+
+    const license = getLicenseByDiscordId(discordId);
+    if (!license) return res.status(404).json({ error: 'No license found' });
+    if (!license.active) return res.status(403).json({ error: 'License is deactivated' });
+    if (license.expiresAt && new Date(license.expiresAt) < new Date()) {
+      return res.status(403).json({ error: 'License has expired' });
+    }
+
+    const tier = license.plan === 'phantom' ? 'PREMIUM' : license.plan === 'pro' ? 'PRO' : 'FREE';
+    res.json({
+      tier,
+      plan: license.plan,
+      key: license.key,
+      discordId: license.discordId,
+      activatedAt: license.activatedAt || license.createdAt,
+    });
+  } catch (error) {
+    console.error('Error fetching license by Discord ID:', error);
+    res.status(500).json({ error: 'Failed to fetch license' });
   }
 });
 
