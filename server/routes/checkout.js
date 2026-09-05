@@ -64,39 +64,54 @@ router.post('/capture-order', async (req, res) => {
     const session = await stripe.checkout.sessions.retrieve(sessionID);
     
     if (session.payment_status === 'paid') {
-      const plan = session.metadata?.plan || 'pro';
-
       // One unique key per purchase: if this session/payment was already
-      // captured (e.g. page refresh), return the SAME key — never a duplicate.
+      // captured (e.g. page refresh), return the SAME keys — never duplicates.
       const existing = getLicenseByTransactionId(session.id) || getLicenseByTransactionId(session.payment_intent);
       if (existing) {
         return res.json({
           status: 'success',
           message: 'Payment already captured',
           licenseKey: existing.key,
+          licenseKeys: [existing.key],
           plan: existing.plan,
           license: existing,
         });
       }
 
-      const licenseKey = generateLicenseKey(plan);
-      
-      const license = createLicense({
-        key: licenseKey,
-        plan: plan,
-        discordId: session.metadata?.discordId || discordId || null,
-        username: session.metadata?.username || username || null,
-        email: session.customer_details?.email || null,
-        transactionId: session.payment_intent,
-        sessionId: session.id,
-      });
+      // Determine what was purchased: items metadata [{plan, qty}] from the cart,
+      // falling back to a single plan for older sessions.
+      let items;
+      try { items = JSON.parse(session.metadata?.items || 'null'); } catch (e) { items = null; }
+      if (!Array.isArray(items) || !items.length) {
+        items = [{ plan: session.metadata?.plan || 'pro', qty: 1 }];
+      }
+
+      // Generate one unique license key per purchased unit
+      const licenseKeys = [];
+      for (const it of items) {
+        const planName = PRICING[it.plan] ? it.plan : 'pro';
+        const qty = Math.max(1, Math.min(50, parseInt(it.qty, 10) || 1));
+        for (let n = 0; n < qty; n++) {
+          const licenseKey = generateLicenseKey(planName);
+          createLicense({
+            key: licenseKey,
+            plan: planName,
+            discordId: session.metadata?.discordId || discordId || null,
+            username: session.metadata?.username || username || null,
+            email: session.customer_details?.email || null,
+            transactionId: session.payment_intent,
+            sessionId: session.id,
+          });
+          licenseKeys.push(licenseKey);
+        }
+      }
 
       res.json({
         status: 'success',
         message: 'Payment captured successfully',
-        licenseKey: licenseKey,
-        plan: plan,
-        license: license,
+        licenseKey: licenseKeys[0],
+        licenseKeys: licenseKeys,
+        plan: items[items.length - 1].plan,
       });
     } else {
       res.status(400).json({ 

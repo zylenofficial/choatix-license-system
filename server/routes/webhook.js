@@ -36,27 +36,41 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
       const session = event.data.object;
 
       if (session.payment_status === 'paid') {
-        // Skip if the capture route (or a previous webhook delivery) already created the key
+        // Skip if the capture route (or a previous webhook delivery) already created the keys
         const existing = getLicenseByTransactionId(session.id) || getLicenseByTransactionId(session.payment_intent);
         if (existing) {
           console.log(`Webhook: license ${existing.key} already exists for this session — skipping`);
           return res.status(200).json({ received: true });
         }
 
-        const plan = session.metadata?.plan || 'pro';
-        const licenseKey = generateLicenseKey(plan);
+        // Determine what was purchased (items metadata from the cart)
+        let items;
+        try { items = JSON.parse(session.metadata?.items || 'null'); } catch (e) { items = null; }
+        if (!Array.isArray(items) || !items.length) {
+          items = [{ plan: session.metadata?.plan || 'pro', qty: 1 }];
+        }
 
-        createLicense({
-          key: licenseKey,
-          plan: plan,
-          discordId: session.metadata?.discordId || null,
-          username: session.metadata?.username || null,
-          email: session.customer_details?.email || null,
-          transactionId: session.payment_intent,
-          sessionId: session.id,
-        });
+        // Generate one unique license key per purchased unit
+        const keys = [];
+        for (const it of items) {
+          const planName = it.plan || 'pro';
+          const qty = Math.max(1, Math.min(50, parseInt(it.qty, 10) || 1));
+          for (let n = 0; n < qty; n++) {
+            const licenseKey = generateLicenseKey(planName);
+            createLicense({
+              key: licenseKey,
+              plan: planName,
+              discordId: session.metadata?.discordId || null,
+              username: session.metadata?.username || null,
+              email: session.customer_details?.email || null,
+              transactionId: session.payment_intent,
+              sessionId: session.id,
+            });
+            keys.push(licenseKey);
+          }
+        }
 
-        console.log(`License created via Stripe webhook: ${licenseKey} for plan: ${plan}`);
+        console.log(`Licenses created via Stripe webhook: ${keys.join(', ')}`);
       }
     }
 

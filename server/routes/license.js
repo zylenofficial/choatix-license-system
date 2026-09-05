@@ -142,19 +142,39 @@ router.post('/validate', (req, res) => {
 });
 
 // ── COMPAT: /api/license/checkout (Stripe) ──────────────────────
-// Same request/response shape the main site expects, but uses Stripe Checkout
+// Same request/response shape the main site expects, but uses Stripe Checkout.
+// Supports a full cart: items: [{ plan, qty }] — charges per unit & quantity.
 router.post('/checkout', async (req, res) => {
   try {
-    const { plan, discordId, username, email, cancel_url } = req.body;
+    const { plan, discordId, username, email, cancel_url, items, discountPercent } = req.body;
 
-    const planConfig = PRICING[plan];
-    if (!planConfig) {
-      return res.status(400).json({ error: 'Invalid plan selected' });
-    }
-
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [{
+    // Build line items — support a cart with multiple plans / quantities
+    let lineItems = [];
+    let metaItems = [];
+    if (Array.isArray(items) && items.length) {
+      for (const it of items.slice(0, 10)) {
+        const planConfig = PRICING[it.plan];
+        if (!planConfig) return res.status(400).json({ error: 'Invalid plan in cart: ' + it.plan });
+        const qty = Math.max(1, Math.min(50, parseInt(it.qty, 10) || 1));
+        lineItems.push({
+          price_data: {
+            currency: planConfig.currency.toLowerCase(),
+            product_data: {
+              name: planConfig.name,
+              description: planConfig.description,
+            },
+            unit_amount: Math.round(planConfig.price * 100),
+          },
+          quantity: qty,
+        });
+        metaItems.push({ plan: it.plan, qty });
+      }
+    } else {
+      const planConfig = PRICING[plan];
+      if (!planConfig) {
+        return res.status(400).json({ error: 'Invalid plan selected' });
+      }
+      lineItems = [{
         price_data: {
           currency: planConfig.currency.toLowerCase(),
           product_data: {
@@ -164,16 +184,32 @@ router.post('/checkout', async (req, res) => {
           unit_amount: Math.round(planConfig.price * 100),
         },
         quantity: 1,
-      }],
+      }];
+      metaItems = [{ plan, qty: 1 }];
+    }
+
+    const sessionParams = {
+      payment_method_types: ['card'],
+      line_items: lineItems,
       mode: 'payment',
       success_url: `https://zylenofficial.github.io/choatix-v2/#license?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: cancel_url || `https://zylenofficial.github.io/choatix-v2/#pricing`,
       metadata: {
-        plan: plan,
+        items: JSON.stringify(metaItems),
+        plan: metaItems[0].plan,
         discordId: discordId || '',
         username: username || '',
       },
-    });
+    };
+
+    // Honor a validated discount code (percent off) via a one-off coupon
+    const pct = parseInt(discountPercent, 10);
+    if (pct > 0 && pct < 100) {
+      const coupon = await stripe.coupons.create({ percent_off: pct, duration: 'once', name: 'Discount code' });
+      sessionParams.discounts = [{ coupon: coupon.id }];
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
 
     res.json({
       orderID: session.id,
