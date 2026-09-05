@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { stripe } = require('../lib/stripeClient');
 const { generateLicenseKey } = require('../lib/licenseGenerator');
-const { createLicense } = require('../lib/database');
+const { createLicense, getLicenseByTransactionId } = require('../lib/database');
 const PRICING = require('../lib/pricing');
 
 const BASE_URL = (process.env.BASE_URL || 'http://localhost:3000').trim();
@@ -65,6 +65,20 @@ router.post('/capture-order', async (req, res) => {
     
     if (session.payment_status === 'paid') {
       const plan = session.metadata?.plan || 'pro';
+
+      // One unique key per purchase: if this session/payment was already
+      // captured (e.g. page refresh), return the SAME key — never a duplicate.
+      const existing = getLicenseByTransactionId(session.id) || getLicenseByTransactionId(session.payment_intent);
+      if (existing) {
+        return res.json({
+          status: 'success',
+          message: 'Payment already captured',
+          licenseKey: existing.key,
+          plan: existing.plan,
+          license: existing,
+        });
+      }
+
       const licenseKey = generateLicenseKey(plan);
       
       const license = createLicense({
@@ -74,6 +88,7 @@ router.post('/capture-order', async (req, res) => {
         username: session.metadata?.username || username || null,
         email: session.customer_details?.email || null,
         transactionId: session.payment_intent,
+        sessionId: session.id,
       });
 
       res.json({

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { stripe } = require('../lib/stripeClient');
 const { generateLicenseKey } = require('../lib/licenseGenerator');
-const { createLicense } = require('../lib/database');
+const { createLicense, getLicenseByTransactionId } = require('../lib/database');
 
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -36,6 +36,13 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
       const session = event.data.object;
 
       if (session.payment_status === 'paid') {
+        // Skip if the capture route (or a previous webhook delivery) already created the key
+        const existing = getLicenseByTransactionId(session.id) || getLicenseByTransactionId(session.payment_intent);
+        if (existing) {
+          console.log(`Webhook: license ${existing.key} already exists for this session — skipping`);
+          return res.status(200).json({ received: true });
+        }
+
         const plan = session.metadata?.plan || 'pro';
         const licenseKey = generateLicenseKey(plan);
 
@@ -46,6 +53,7 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
           username: session.metadata?.username || null,
           email: session.customer_details?.email || null,
           transactionId: session.payment_intent,
+          sessionId: session.id,
         });
 
         console.log(`License created via Stripe webhook: ${licenseKey} for plan: ${plan}`);

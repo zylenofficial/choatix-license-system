@@ -55,6 +55,13 @@ function getLicenseByDiscordId(discordId) {
   return db.licenses.find(license => license.discordId === discordId) || null;
 }
 
+// Get license by transaction / checkout session ID (prevents duplicate keys)
+function getLicenseByTransactionId(transactionId) {
+  if (!transactionId) return null;
+  const db = readDB();
+  return db.licenses.find(license => license.transactionId === transactionId || license.sessionId === transactionId) || null;
+}
+
 // Create new license
 function createLicense(licenseData) {
   const db = readDB();
@@ -66,6 +73,7 @@ function createLicense(licenseData) {
     username: licenseData.username || null,
     email: licenseData.email || null,
     transactionId: licenseData.transactionId,
+    sessionId: licenseData.sessionId || null,
     createdAt: new Date().toISOString(),
     expiresAt: licenseData.expiresAt || null,
     active: true
@@ -106,6 +114,7 @@ module.exports = {
   writeDB,
   getLicenseByKey,
   getLicenseByDiscordId,
+  getLicenseByTransactionId,
   createLicense,
   updateLicense,
   deactivateLicense
